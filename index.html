@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Precision Under Time Pressure Study</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #fafafa;
+            --bg-secondary: #ffffff;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --timer-green: rgb(0, 180, 0);
+            --timer-yellow: rgb(220, 180, 0);
+            --timer-red: rgb(220, 0, 0);
+            --success: #10b981;
+            --error: #ef4444;
+            --border: #d4d4d4;
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'IBM Plex Sans', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .screen { display: none; min-height: 100vh; }
+        .screen.active { display: flex; }
+
+        #setup-screen {
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .setup-container {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+            padding: 2.5rem;
+            max-width: 480px;
+            width: 100%;
+        }
+
+        .setup-header { text-align: center; margin-bottom: 2rem; }
+        .setup-header h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .setup-header p { color: var(--text-secondary); }
+
+        .form-group { margin-bottom: 1.25rem; }
+        .form-group label { display: block; font-weight: 500; margin-bottom: 0.4rem; font-size: 0.9rem; }
+        .form-group select {
+            width: 100%;
+            padding: 0.7rem;
+            border: 1.5px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: 'IBM Plex Mono', monospace;
+            background: var(--bg-primary);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .checkbox-group input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+        .btn {
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-primary { background: var(--accent); color: white; width: 100%; margin-top: 1rem; }
+        .btn-primary:hover { background: var(--accent-hover); }
+
+        #task-screen { flex-direction: column; background: white; height: 100vh; width: 100vw; }
+
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 2rem;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .task-info { font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; }
+        .task-info .sequence { font-weight: 600; }
+        .task-info .device { color: var(--text-secondary); }
+
+        .timer-display {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 2.5rem;
+            font-weight: 600;
+            min-width: 140px;
+            text-align: center;
+        }
+        .timer-display.green { color: var(--timer-green); }
+        .timer-display.yellow { color: var(--timer-yellow); }
+        .timer-display.red { color: var(--timer-red); }
+        .timer-display.no-limit { color: var(--text-secondary); font-size: 1rem; }
+
+        .task-canvas-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        #task-canvas { cursor: crosshair; }
+
+        .practice-banner {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            color: #92400e;
+            text-align: center;
+            padding: 0.7rem;
+            font-weight: 600;
+            display: none;
+        }
+        .practice-banner.active { display: block; }
+
+        .practice-controls {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            z-index: 100;
+        }
+        .practice-controls.active { display: block; }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .modal-overlay.active { display: flex !important; }
+
+        .modal {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+            padding: 2rem;
+            max-width: 420px;
+            width: 90%;
+        }
+        .modal h2 { font-size: 1.4rem; text-align: center; margin-bottom: 0.5rem; }
+        .modal-subtitle { text-align: center; color: var(--text-secondary); margin-bottom: 1.25rem; }
+
+        .device-options { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1.25rem; }
+        .device-option {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.9rem;
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        .device-option:hover { border-color: var(--accent); }
+        .device-option.selected { border-color: var(--accent); background: rgba(37,99,235,0.1); }
+        .device-option input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+        .summary-stats { background: var(--bg-primary); border-radius: 10px; padding: 1.25rem; margin-bottom: 1.25rem; }
+        .stat-row { display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid var(--border); }
+        .stat-row:last-child { border-bottom: none; }
+        .stat-label { color: var(--text-secondary); }
+        .stat-value { font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
+
+        .timeout-warning {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            padding: 0.9rem;
+            margin-bottom: 1rem;
+            color: #991b1b;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        #end-screen { flex-direction: column; align-items: center; justify-content: center; padding: 2rem; }
+        .end-container {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+            padding: 2.5rem;
+            max-width: 480px;
+            width: 100%;
+            text-align: center;
+        }
+        .end-container h1 { color: var(--success); margin-bottom: 1rem; }
+        .download-buttons { display: flex; flex-direction: column; gap: 0.8rem; margin-top: 1.5rem; }
+        .download-btn {
+            padding: 0.9rem;
+            background: var(--bg-primary);
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .download-btn:hover { border-color: var(--accent); }
+
+        #debug-panel {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.85);
+            color: #0f0;
+            font-family: monospace;
+            font-size: 11px;
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 10000;
+            max-width: 320px;
+            display: none;
+        }
+        
+        .methodology-panel {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            font-size: 0.85rem;
+        }
+        .methodology-panel summary {
+            padding: 0.8rem 1rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: #0369a1;
+        }
+        .methodology-panel summary:hover { background: #e0f2fe; border-radius: 8px; }
+        .methodology-content {
+            padding: 0 1rem 1rem 1rem;
+        }
+        .iso-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+            margin-bottom: 0.8rem;
+        }
+        .iso-table th, .iso-table td {
+            padding: 0.5rem;
+            border: 1px solid #bae6fd;
+            text-align: left;
+        }
+        .iso-table th {
+            background: #0369a1;
+            color: white;
+            font-weight: 600;
+        }
+        .iso-table tr:nth-child(even) { background: #e0f2fe; }
+        .methodology-note {
+            margin: 0;
+            padding: 0.6rem;
+            background: #fef3c7;
+            border-radius: 4px;
+            color: #92400e;
+            font-size: 0.8rem;
+        }
+        .time-hint {
+            font-size: 0.75rem;
+            color: #6b7280;
+            font-weight: normal;
+        }
+    </style>
+</head>
+<body>
+    <div id="debug-panel"></div>
+
+    <!-- Setup Screen -->
+    <div id="setup-screen" class="screen active">
+        <div class="setup-container">
+            <div class="setup-header">
+                <h1>Precision Under Time Pressure</h1>
+                <p>Fitts' Law Pointing Device Study</p>
+            </div>
+            
+            <!-- ISO Methodology Panel -->
+            <details class="methodology-panel">
+                <summary>📋 ISO 9241-411 Compliance Details</summary>
+                <div class="methodology-content">
+                    <table class="iso-table">
+                        <tr><th>Standard</th><th>Requirement</th><th>Implementation</th></tr>
+                        <tr><td>ISO 9241-411:2012</td><td>Multi-directional tapping task</td><td>✓ Circular target layout</td></tr>
+                        <tr><td>ISO 9241-411:2012</td><td>Minimum 9 targets</td><td>✓ 13 targets (recommended)</td></tr>
+                        <tr><td>ISO 9241-411:2012</td><td>Multiple A-W conditions</td><td>✓ 3 conditions (ID: 1.58, 3.46, 4.39)</td></tr>
+                        <tr><td>ISO 9241-411:2012</td><td>Throughput calculation</td><td>✓ TP = IDe / MT using We = 4.133 × SDx</td></tr>
+                        <tr><td>ISO 9241-411:2012</td><td>Effective amplitude (Ae)</td><td>✓ Calculated from actual movement</td></tr>
+                    </table>
+                    <p class="methodology-note"><strong>Novel contribution:</strong> Time pressure manipulation to study pointing performance under stress conditions. The visible countdown creates psychological pressure; the goal is pressure perception, not forced timeouts.</p>
+                </div>
+            </details>
+            
+            <form id="setup-form">
+                <div class="form-group">
+                    <label>Participant Code</label>
+                    <select id="participant-code"></select>
+                </div>
+                <div class="form-group">
+                    <label>Session Code</label>
+                    <select id="session-code"></select>
+                </div>
+                <div class="form-group">
+                    <label>Group Code</label>
+                    <select id="group-code"></select>
+                </div>
+                <div class="form-group">
+                    <label>Time Limit (seconds) <span class="time-hint">💡 30-45s recommended</span></label>
+                    <select id="time-limit">
+                        <option value="20">20 seconds (strict)</option>
+                        <option value="25">25 seconds</option>
+                        <option value="30">30 seconds</option>
+                        <option value="35" selected>35 seconds (recommended)</option>
+                        <option value="40">40 seconds</option>
+                        <option value="45">45 seconds</option>
+                        <option value="50">50 seconds</option>
+                        <option value="60">60 seconds (relaxed)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-group">
+                        <input type="checkbox" id="practice-mode" checked>
+                        <span>Enable Practice Mode</span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-group">
+                        <input type="checkbox" id="debug-mode">
+                        <span>Show Debug Info</span>
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary">Start Experiment</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Task Screen -->
+    <div id="task-screen" class="screen">
+        <div class="practice-banner" id="practice-banner">PRACTICE MODE — Click "Start Sequence" when ready</div>
+        <div class="task-header">
+            <div class="task-info">
+                <div class="sequence" id="sequence-info">Sequence 1 of 18</div>
+                <div class="device" id="device-info">Device: Mouse</div>
+            </div>
+            <div class="timer-display no-limit" id="timer-display">No Time Limit</div>
+            <div class="task-info" style="text-align:right">
+                <div id="trial-info">Trial: 0 / 12</div>
+                <div id="condition-info">Baseline</div>
+            </div>
+        </div>
+        <div class="task-canvas-container">
+            <canvas id="task-canvas"></canvas>
+        </div>
+        <div class="practice-controls" id="practice-controls">
+            <button class="btn btn-primary" id="start-sequence-btn">Start Sequence</button>
+        </div>
+    </div>
+
+    <!-- End Screen -->
+    <div id="end-screen" class="screen">
+        <div class="end-container">
+            <h1>✓ Experiment Complete!</h1>
+            <p>Thank you for participating.</p>
+            <div class="download-buttons">
+                <button class="download-btn" id="download-sd1">Download Trial Data (sd1.csv)</button>
+                <button class="download-btn" id="download-sd2">Download Summary Data (sd2.csv)</button>
+                <button class="download-btn" id="download-sd3">Download Trace Data (sd3.csv)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Device Modal -->
+    <div class="modal-overlay" id="device-modal">
+        <div class="modal">
+            <h2>Select Input Device</h2>
+            <p class="modal-subtitle" id="device-modal-subtitle">For Sequences 1 & 2</p>
+            <div class="device-options">
+                <div class="device-option" data-device="Mouse">
+                    <input type="radio" name="device" value="Mouse">
+                    <label>Mouse (External USB)</label>
+                </div>
+                <div class="device-option" data-device="Touchpad">
+                    <input type="radio" name="device" value="Touchpad">
+                    <label>Touchpad (Built-in)</label>
+                </div>
+                <div class="device-option" data-device="TrackPoint">
+                    <input type="radio" name="device" value="TrackPoint">
+                    <label>TrackPoint (Red Nub)</label>
+                </div>
+            </div>
+            <button class="btn btn-primary" id="device-continue-btn" disabled>Continue</button>
+        </div>
+    </div>
+
+    <!-- Summary Modal -->
+    <div class="modal-overlay" id="summary-modal">
+        <div class="modal">
+            <h2 id="summary-title">Sequence Summary</h2>
+            <div id="timeout-warning" class="timeout-warning" style="display:none">TIME'S UP!</div>
+            <div class="summary-stats">
+                <div class="stat-row"><span class="stat-label">Trials Completed</span><span class="stat-value" id="summary-trials">0/12</span></div>
+                <div class="stat-row"><span class="stat-label">Mean MT</span><span class="stat-value" id="summary-mt">---</span></div>
+                <div class="stat-row"><span class="stat-label">Error Rate</span><span class="stat-value" id="summary-error">---</span></div>
+                <div class="stat-row"><span class="stat-label">Throughput</span><span class="stat-value" id="summary-tp">---</span></div>
+            </div>
+            <button class="btn btn-primary" id="summary-continue-btn">Continue</button>
+        </div>
+    </div>
+
+    <script>
+        // Populate dropdowns
+        ['participant-code','session-code','group-code'].forEach((id, i) => {
+            const sel = document.getElementById(id);
+            const prefix = ['P','S','G'][i];
+            const max = [50,30,10][i];
+            for (let j = 0; j <= max; j++) {
+                const opt = document.createElement('option');
+                opt.value = opt.textContent = prefix + j.toString().padStart(2,'0');
+                sel.appendChild(opt);
+            }
+        });
+
+        // Audio
+        const Audio = {
+            ctx: null,
+            init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+            play(freq, type, dur) {
+                if (!this.ctx) this.init();
+                const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+                o.connect(g); g.connect(this.ctx.destination);
+                o.frequency.value = freq; o.type = type;
+                g.gain.setValueAtTime(0.25, this.ctx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + dur);
+                o.start(); o.stop(this.ctx.currentTime + dur);
+            },
+            tick() { this.play(1200,'sine',0.08); },
+            error() { this.play(200,'square',0.2); },
+            success() { this.play(880,'sine',0.1); }
+        };
+
+        // Main Experiment
+        const E = {
+            NUM_TARGETS: 13,
+            NUM_TRIALS: 12,
+            TOTAL_SEQ: 18,
+            
+            // Three A-W conditions for variety (like GoFitts)
+            AW_CONDITIONS: [
+                { A: 200, W: 80, label: 'Easy (ID=1.58)' },    // Big overlapping circles
+                { A: 400, W: 40, label: 'Medium (ID=3.46)' },  // Standard ISO layout
+                { A: 400, W: 20, label: 'Hard (ID=4.39)' }     // Small circles far apart
+            ],
+            SEQ_PER_DEVICE: 6,  // 3 A-W conditions × 2 time conditions
+            
+            currentA: 400,
+            currentW: 40,
+
+            config: null,
+            seq: 0,
+            trial: -1,
+            device: null,
+            devices: [],
+
+            isPractice: false,
+            isTimed: false,
+            started: false,
+            timedOut: false,
+            debug: false,
+
+            lastClick: 0,
+            btnDown: 0,
+            timeLeft: 0,
+            timerInt: null,
+            lastColor: 'green',
+
+            targets: [],
+            order: [],
+            active: 0,
+
+            seqTrials: [],
+            allTrials: [],
+            allSeq: [],
+            allTrace: [],
+            curTrace: {t:[],x:[],y:[]},
+            traceInt: null,
+            mx: 0, my: 0,
+
+            canvas: null,
+            ctx: null,
+
+            init() {
+                this.canvas = document.getElementById('task-canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.bindEvents();
+            },
+
+            bindEvents() {
+                document.getElementById('setup-form').addEventListener('submit', e => { e.preventDefault(); this.start(); });
+                
+                document.querySelectorAll('.device-option').forEach(o => {
+                    o.addEventListener('click', () => {
+                        document.querySelectorAll('.device-option').forEach(x => x.classList.remove('selected'));
+                        o.classList.add('selected');
+                        o.querySelector('input').checked = true;
+                        document.getElementById('device-continue-btn').disabled = false;
+                    });
+                });
+
+                document.getElementById('device-continue-btn').addEventListener('click', () => this.deviceSelected());
+                document.getElementById('start-sequence-btn').addEventListener('click', () => this.endPractice());
+                document.getElementById('summary-continue-btn').addEventListener('click', () => this.summaryContinue());
+
+                this.canvas.addEventListener('mousedown', e => { this.btnDown = performance.now(); });
+                this.canvas.addEventListener('mouseup', e => this.click(e));
+                this.canvas.addEventListener('mousemove', e => {
+                    const r = this.canvas.getBoundingClientRect();
+                    this.mx = e.clientX - r.left;
+                    this.my = e.clientY - r.top;
+                });
+
+                document.getElementById('download-sd1').addEventListener('click', () => this.dlSD1());
+                document.getElementById('download-sd2').addEventListener('click', () => this.dlSD2());
+                document.getElementById('download-sd3').addEventListener('click', () => this.dlSD3());
+
+                window.addEventListener('resize', () => {
+                    if (document.getElementById('task-screen').classList.contains('active')) this.setupCanvas();
+                });
+            },
+
+            show(id) {
+                document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+                document.getElementById(id).classList.add('active');
+            },
+
+            start() {
+                this.config = {
+                    p: document.getElementById('participant-code').value,
+                    s: document.getElementById('session-code').value,
+                    g: document.getElementById('group-code').value,
+                    time: parseInt(document.getElementById('time-limit').value),
+                    practice: document.getElementById('practice-mode').checked
+                };
+                this.debug = document.getElementById('debug-mode').checked;
+                if (this.debug) document.getElementById('debug-panel').style.display = 'block';
+
+                Audio.init();
+                this.show('task-screen');
+                setTimeout(() => { this.setupCanvas(); this.showDevice(1); }, 50);
+            },
+
+            showDevice(n) {
+                const startSeq = (n-1) * this.SEQ_PER_DEVICE + 1;
+                const endSeq = n * this.SEQ_PER_DEVICE;
+                document.getElementById('device-modal-subtitle').textContent = `For Sequences ${startSeq}-${endSeq}`;
+                document.querySelectorAll('.device-option').forEach(o => o.classList.remove('selected'));
+                document.querySelectorAll('input[name="device"]').forEach(r => r.checked = false);
+                document.getElementById('device-continue-btn').disabled = true;
+                document.getElementById('device-modal').classList.add('active');
+            },
+
+            deviceSelected() {
+                const sel = document.querySelector('input[name="device"]:checked');
+                if (!sel) return;
+                this.device = sel.value;
+                this.devices.push(this.device);
+                document.getElementById('device-modal').classList.remove('active');
+                this.setupCanvas();
+                if (this.config.practice) this.startPractice();
+                else this.startSeq();
+            },
+
+            startPractice() {
+                this.isPractice = true;
+                this.started = false;
+                this.active = 0;
+                // Use medium A-W condition for practice (standard ISO layout)
+                this.currentA = this.AW_CONDITIONS[1].A;
+                this.currentW = this.AW_CONDITIONS[1].W;
+                this.genOrder();
+                this.setupCanvas();
+                document.getElementById('practice-banner').classList.add('active');
+                document.getElementById('practice-controls').classList.add('active');
+                this.updateUI();
+                this.render();
+                this.log('Practice started');
+            },
+
+            endPractice() {
+                this.isPractice = false;
+                document.getElementById('practice-banner').classList.remove('active');
+                document.getElementById('practice-controls').classList.remove('active');
+                this.startSeq();
+            },
+
+            startSeq() {
+                this.stopTimer();
+                if (this.traceInt) { clearInterval(this.traceInt); this.traceInt = null; }
+
+                this.seq++;
+                this.trial = -1;
+                this.started = false;
+                this.timedOut = false;
+                this.lastColor = 'green';
+                this.active = 0;
+                this.seqTrials = [];
+                this.curTrace = {t:[],x:[],y:[]};
+
+                // Determine A-W condition: sequences 1-2 use AW[0], sequences 3-4 use AW[1], etc.
+                const seqWithinDevice = ((this.seq - 1) % this.SEQ_PER_DEVICE) + 1;
+                const awIndex = Math.floor((seqWithinDevice - 1) / 2);
+                this.currentA = this.AW_CONDITIONS[awIndex].A;
+                this.currentW = this.AW_CONDITIONS[awIndex].W;
+                
+                this.isTimed = (this.seq % 2 === 0);
+                this.timeLeft = this.config.time;
+
+                this.genOrder();
+                this.setupCanvas();
+                this.updateUI();
+                this.render();
+                this.log(`Seq ${this.seq} start. A=${this.currentA} W=${this.currentW} Timed: ${this.isTimed}`);
+            },
+
+            setupCanvas() {
+                const c = document.querySelector('.task-canvas-container');
+                const r = c.getBoundingClientRect();
+                this.canvas.width = r.width || 800;
+                this.canvas.height = r.height || 600;
+                this.calcTargets();
+                this.render();
+                this.log(`Canvas ${this.canvas.width}x${this.canvas.height}`);
+            },
+
+            calcTargets() {
+                this.targets = [];
+                const cx = this.canvas.width / 2, cy = this.canvas.height / 2, rad = this.currentA / 2;
+                for (let i = 0; i < this.NUM_TARGETS; i++) {
+                    const a = (2 * Math.PI * i / this.NUM_TARGETS) - Math.PI/2;
+                    this.targets.push({ x: cx + rad * Math.cos(a), y: cy + rad * Math.sin(a), r: this.currentW/2 });
+                }
+            },
+
+            genOrder() {
+                this.order = [];
+                for (let i = 0; i < this.NUM_TARGETS; i++) {
+                    const idx = i % 2 === 0 ? Math.floor(i/2) : Math.floor((i + this.NUM_TARGETS)/2);
+                    this.order.push(idx % this.NUM_TARGETS);
+                }
+                this.order.push(this.order[0]);
+            },
+
+            render() {
+                const ctx = this.ctx;
+                ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                for (let i = 0; i < this.targets.length; i++) {
+                    const t = this.targets[i];
+                    const isActive = (i === this.order[this.active]);
+                    ctx.beginPath();
+                    ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2);
+                    ctx.fillStyle = isActive ? '#ff0000' : '#e5e5e5';
+                    ctx.fill();
+                    ctx.strokeStyle = '#333';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+            },
+
+            click(e) {
+                if (this.timedOut) { this.log('Ignored - timed out'); return; }
+
+                const r = this.canvas.getBoundingClientRect();
+                const x = e.clientX - r.left, y = e.clientY - r.top;
+                const now = performance.now();
+
+                const ti = this.order[this.active];
+                const t = this.targets[ti];
+                if (!t) { this.log('No target!'); return; }
+
+                const d = Math.sqrt((x-t.x)**2 + (y-t.y)**2);
+                const hit = d <= t.r;
+
+                this.log(`Click(${x.toFixed(0)},${y.toFixed(0)}) T(${t.x.toFixed(0)},${t.y.toFixed(0)}) d=${d.toFixed(0)} hit=${hit}`);
+
+                // PRACTICE
+                if (this.isPractice) {
+                    if (hit) { Audio.success(); this.active = (this.active + 1) % this.order.length; }
+                    else Audio.error();
+                    this.render();
+                    return;
+                }
+
+                // FIRST CLICK
+                if (!this.started) {
+                    if (!hit) { Audio.error(); this.log('First miss'); return; }
+                    this.started = true;
+                    this.lastClick = now;
+                    this.trial = 0;
+                    if (this.isTimed) this.startTimer();
+                    this.startTrace();
+                    this.active++;
+                    Audio.success();
+                    this.updateUI();
+                    this.render();
+                    this.log('Started!');
+                    return;
+                }
+
+                // TRIAL
+                this.trial++;
+                const fi = this.order[this.active - 1], toi = this.order[this.active];
+                const ft = this.targets[fi], tt = this.targets[toi];
+
+                const PT = this.btnDown - this.lastClick;
+                const ST = now - this.btnDown;
+                const MT = PT + ST;
+
+                const cond = {Mouse:'C01',Touchpad:'C02',TrackPoint:'C03'}[this.device];
+                const td = {
+                    participant: this.config.p, condition: cond, session: this.config.s, group: this.config.g,
+                    block: 'B01', sequence: this.seq, trial: this.trial,
+                    A: this.currentA, W: this.currentW,
+                    fromX: ft.x, fromY: ft.y, toX: tt.x, toY: tt.y,
+                    selectX: x, selectY: y, PT, ST, MT,
+                    error: hit ? 0 : 1,
+                    timePressure: this.isTimed ? 'Yes' : 'No',
+                    timestamp: Date.now()
+                };
+                this.seqTrials.push(td);
+                this.allTrials.push(td);
+                this.saveTrace(ft, tt, cond);
+
+                hit ? Audio.success() : Audio.error();
+                this.lastClick = now;
+
+                if (this.trial >= this.NUM_TRIALS) { this.endSeq(false); return; }
+
+                this.active++;
+                this.curTrace = {t:[],x:[],y:[]};
+                this.updateUI();
+                this.render();
+            },
+
+            startTimer() {
+                this.timeLeft = this.config.time;
+                const disp = document.getElementById('timer-display');
+                this.timerInt = setInterval(() => {
+                    this.timeLeft -= 0.1;
+                    if (this.timeLeft <= 0) { this.timeout(); return; }
+                    disp.textContent = this.timeLeft.toFixed(1) + 's';
+                    const pct = this.timeLeft / this.config.time;
+                    const col = pct > 0.67 ? 'green' : pct > 0.33 ? 'yellow' : 'red';
+                    disp.className = 'timer-display ' + col;
+                    if (col !== this.lastColor) { Audio.tick(); this.lastColor = col; }
+                }, 100);
+            },
+
+            stopTimer() {
+                if (this.timerInt) { clearInterval(this.timerInt); this.timerInt = null; }
+            },
+
+            timeout() {
+                this.timedOut = true;
+                this.stopTimer();
+                Audio.error();
+                document.getElementById('timer-display').textContent = '0.0s';
+                document.getElementById('timer-display').className = 'timer-display red';
+                if (this.traceInt) clearInterval(this.traceInt);
+                this.log('TIMEOUT');
+                this.endSeq(true);
+            },
+
+            startTrace() {
+                this.traceInt = setInterval(() => {
+                    if (!this.started || this.timedOut) { clearInterval(this.traceInt); return; }
+                    this.curTrace.t.push(Math.round(performance.now() - this.lastClick));
+                    this.curTrace.x.push(Math.round(this.mx));
+                    this.curTrace.y.push(Math.round(this.my));
+                }, 50);
+            },
+
+            saveTrace(ft, tt, cond) {
+                if (!this.curTrace.t.length) return;
+                this.allTrace.push({
+                    participant: this.config.p, condition: cond, session: this.config.s, group: this.config.g,
+                    block: 'B01', sequence: this.seq, trial: this.trial,
+                    A: this.currentA, W: this.currentW,
+                    fromX: ft.x, fromY: ft.y, toX: tt.x, toY: tt.y,
+                    t: [...this.curTrace.t], x: [...this.curTrace.x], y: [...this.curTrace.y]
+                });
+            },
+
+            endSeq(to) {
+                this.stopTimer();
+                this.started = false;
+                if (this.traceInt) { clearInterval(this.traceInt); this.traceInt = null; }
+
+                const tr = this.seqTrials, n = tr.length;
+                const mt = n > 0 ? tr.reduce((s,t) => s+t.MT, 0) / n : 0;
+                const err = n > 0 ? tr.filter(t => t.error).length / n * 100 : 0;
+
+                // FIX: If trials incomplete, it must be a timeout (regardless of 'to' parameter)
+                const actuallyTimedOut = to || (n < this.NUM_TRIALS);
+
+                let tp = 0;
+                if (n >= 3 && !actuallyTimedOut) {
+                    const dx = tr.map(t => {
+                        const ax = t.toX - t.fromX, ay = t.toY - t.fromY;
+                        const bx = t.selectX - t.toX, by = t.selectY - t.toY;
+                        const m = Math.sqrt(ax*ax+ay*ay);
+                        return m > 0 ? (ax*bx+ay*by)/m : 0;
+                    });
+                    const mean = dx.reduce((a,b)=>a+b,0)/dx.length;
+                    const v = dx.reduce((s,x)=>s+(x-mean)**2,0)/dx.length;
+                    const We = 4.133 * Math.sqrt(v);
+                    const IDe = Math.log2(this.currentA / We + 1);
+                    tp = (IDe / mt) * 1000;
+                }
+
+                const cond = {Mouse:'C01',Touchpad:'C02',TrackPoint:'C03'}[this.device];
+                this.allSeq.push({
+                    participant: this.config.p, condition: cond, session: this.config.s, group: this.config.g,
+                    block: 'B01', sequence: this.seq, device: this.device,
+                    timePressure: this.isTimed ? 'Yes' : 'No', timeLimit: this.isTimed ? this.config.time : 0,
+                    trialsCompleted: n, totalTrials: this.NUM_TRIALS,
+                    A: this.currentA, W: this.currentW,
+                    ID: Math.log2(this.currentA/this.currentW+1),
+                    meanMT: mt, errorRate: err, throughput: tp, timedOut: actuallyTimedOut
+                });
+
+                this.showSummary(n, mt, err, tp, actuallyTimedOut);
+            },
+
+            showSummary(n, mt, err, tp, to) {
+                document.getElementById('summary-title').textContent = to ? 'Sequence Incomplete' : 'Sequence Summary';
+                document.getElementById('timeout-warning').style.display = to ? 'block' : 'none';
+                document.getElementById('summary-trials').textContent = `${n} / ${this.NUM_TRIALS}`;
+                document.getElementById('summary-mt').textContent = n > 0 ? `${mt.toFixed(1)} ms` : '---';
+                document.getElementById('summary-error').textContent = n > 0 ? `${err.toFixed(1)}%` : '---';
+                document.getElementById('summary-tp').textContent = tp > 0 ? `${tp.toFixed(2)} bits/s` : (to ? 'N/A' : '---');
+                document.getElementById('summary-modal').classList.add('active');
+            },
+
+            summaryContinue() {
+                document.getElementById('summary-modal').classList.remove('active');
+                if (this.seq >= this.TOTAL_SEQ) { this.show('end-screen'); return; }
+                // Show device selection every SEQ_PER_DEVICE sequences (after seq 6, 12)
+                if (this.seq % this.SEQ_PER_DEVICE === 0) this.showDevice(this.seq / this.SEQ_PER_DEVICE + 1);
+                else setTimeout(() => this.startSeq(), 100);
+            },
+
+            updateUI() {
+                document.getElementById('sequence-info').textContent = `Sequence ${this.seq} of ${this.TOTAL_SEQ}`;
+                document.getElementById('device-info').textContent = `Device: ${this.device}`;
+                const td = document.getElementById('timer-display');
+                const id = Math.log2(this.currentA / this.currentW + 1).toFixed(2);
+                if (this.isPractice) {
+                    document.getElementById('trial-info').textContent = 'Practice';
+                    document.getElementById('condition-info').textContent = `A=${this.currentA}, W=${this.currentW} (ID=${id})`;
+                    td.textContent = 'No Limit';
+                    td.className = 'timer-display no-limit';
+                } else {
+                    document.getElementById('trial-info').textContent = `Trial: ${Math.max(0,this.trial)} / ${this.NUM_TRIALS}`;
+                    const timeLabel = this.isTimed ? 'Timed' : 'Baseline';
+                    document.getElementById('condition-info').textContent = `${timeLabel} | A=${this.currentA}, W=${this.currentW} (ID=${id})`;
+                    if (this.isTimed && !this.started) {
+                        td.textContent = `${this.config.time}.0s`;
+                        td.className = 'timer-display green';
+                    } else if (!this.isTimed) {
+                        td.textContent = 'No Limit';
+                        td.className = 'timer-display no-limit';
+                    }
+                }
+            },
+
+            log(m) {
+                if (!this.debug) return;
+                document.getElementById('debug-panel').innerHTML = `<b>Seq:</b>${this.seq} <b>Tr:</b>${this.trial} <b>Act:</b>${this.active}<br><b>Timed:</b>${this.isTimed} <b>Started:</b>${this.started} <b>TO:</b>${this.timedOut}<br>${m}`;
+                console.log('[F]', m);
+            },
+
+            dl(c, f) {
+                const b = new Blob([c], {type:'text/csv'});
+                const l = document.createElement('a');
+                l.href = URL.createObjectURL(b);
+                l.download = f;
+                l.click();
+            },
+
+            dlSD1() {
+                const h = 'App,Participant,Condition,Session,Group,Block,Sequence,Trial,A,W,FromX,FromY,ToX,ToY,SelectX,SelectY,PT,ST,MT,Error,TimePressure,Timestamp\n';
+                let c = h;
+                for (const t of this.allTrials) {
+                    c += `FittsTask,${t.participant},${t.condition},${t.session},${t.group},${t.block},${t.sequence},${t.trial},${t.A},${t.W},${t.fromX.toFixed(1)},${t.fromY.toFixed(1)},${t.toX.toFixed(1)},${t.toY.toFixed(1)},${t.selectX.toFixed(1)},${t.selectY.toFixed(1)},${t.PT.toFixed(1)},${t.ST.toFixed(1)},${t.MT.toFixed(1)},${t.error},${t.timePressure},${t.timestamp}\n`;
+                }
+                this.dl(c, `FittsTask-${this.config.p}-${this.config.s}-${this.config.g}-B01-sd1.csv`);
+            },
+
+            dlSD2() {
+                const h = 'App,Participant,Condition,Session,Group,Block,Sequence,Device,TimePressure,TimeLimit,TrialsCompleted,TotalTrials,A,W,ID,MeanMT,ErrorRate,Throughput,TimedOut\n';
+                let c = h;
+                for (const s of this.allSeq) {
+                    c += `FittsTask,${s.participant},${s.condition},${s.session},${s.group},${s.block},${s.sequence},${s.device},${s.timePressure},${s.timeLimit},${s.trialsCompleted},${s.totalTrials},${s.A},${s.W},${s.ID.toFixed(3)},${s.meanMT.toFixed(1)},${s.errorRate.toFixed(1)},${s.throughput.toFixed(3)},${s.timedOut?'Yes':'No'}\n`;
+                }
+                this.dl(c, `FittsTask-${this.config.p}-${this.config.s}-${this.config.g}-B01-sd2.csv`);
+            },
+
+            dlSD3() {
+                const h = 'App,Participant,Condition,Session,Group,Block,Sequence,Trial,A,W,FromX,FromY,ToX,ToY,Type,Values\n';
+                let c = h;
+                for (const tr of this.allTrace) {
+                    const b = `FittsTask,${tr.participant},${tr.condition},${tr.session},${tr.group},${tr.block},${tr.sequence},${tr.trial},${tr.A},${tr.W},${tr.fromX.toFixed(1)},${tr.fromY.toFixed(1)},${tr.toX.toFixed(1)},${tr.toY.toFixed(1)}`;
+                    c += `${b},t,${tr.t.join(';')}\n`;
+                    c += `${b},x,${tr.x.join(';')}\n`;
+                    c += `${b},y,${tr.y.join(';')}\n`;
+                }
+                this.dl(c, `FittsTask-${this.config.p}-${this.config.s}-${this.config.g}-B01-sd3.csv`);
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => E.init());
+    </script>
+</body>
+</html>
