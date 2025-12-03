@@ -126,7 +126,6 @@ Following standard Fitts' law experiment conventions:
 
 ## Alternative Citations (Not MacKenzie)
 
-If you cannot cite MacKenzie's work, these papers also follow ISO 9241-9 methodology:
 
 1. Wobbrock, J. O., Cutrell, E., Harada, S., & MacKenzie, I. S. (2008). An error model for pointing based on Fitts' law. *Proceedings of the SIGCHI Conference on Human Factors in Computing Systems*, 1613-1622.
    - **Use for:** Error rate analysis methodology
